@@ -37,6 +37,7 @@ FetchContent_MakeAvailable(base assembly spd_logger asio_comm json_config)
 
 # Boost comes from system packages (docs/kit/build.md#dependencies).
 nom_find_boost()
+find_package(Threads REQUIRED)
 
 # Discover Catch2 before any code directory can register an inline test suite.
 if(nom_build_tests)

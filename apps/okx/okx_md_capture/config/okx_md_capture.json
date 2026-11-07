@@ -1,0 +1,32 @@
+{
+    "log": {
+        "level": "info",
+        "file": null
+    },
+    "health_checker": {
+        "period_msec": 2000
+    },
+    "md_subscriber": {
+        "connection": {
+            "endpoint": "wss://ws.okx.com/ws/v5/public",
+            "heartbeat_sec": 20
+        },
+        "subscription": {
+            "symbols": [
+                "BTC-USDT"
+            ],
+            "channels": [
+                "tickers",
+                "trades",
+                "books"
+            ]
+        }
+    },
+    "md_sink": {
+        "md_logger": {
+            "file": "data/okx_spot.txt",
+            "flush_records": 4096,
+            "flush_ms": 200
+        }
+    }
+}

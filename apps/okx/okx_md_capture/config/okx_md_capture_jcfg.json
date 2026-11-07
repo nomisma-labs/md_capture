@@ -1,0 +1,8 @@
+[
+    {
+        "jcfg": {
+            "name": "dev",
+            "import": "okx_md_capture.json"
+        }
+    }
+]
