@@ -20,6 +20,6 @@ Rules for this repo alone follow below.
 - Keep exchange-specific subscription, heartbeat, reconnection, freshness and persistence
   policy in this application layer; transport protocol mechanics belong in `asio_comm`.
 - Keep exchange applications under `apps/<exchange>/<app>/`, with per-app configuration and
-  a README. Extract shared capture code into `core/` when its contract is established.
+  a README. Extract shared capture code into `src/` when its contract is established.
 - Relay delivery is synchronous. Borrowed transport payloads must be consumed within their
   callback or copied into owned storage before deferred processing.

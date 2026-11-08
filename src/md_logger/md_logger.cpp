@@ -45,15 +45,7 @@ namespace nom
         {
             // Wake the stop-aware wait; jthread joins before the worker's state is destroyed.
             worker_.request_stop();
-            // TODO(spd_logger): Add no-throw versions of LERROR and LALWAYS, then remove this guard.
-            try
-            {
-                LERROR("MD logger cleanup failed; pending data may be lost");
-            }
-            catch (...)
-            {
-                // Diagnostic failure must not prevent the worker from joining.
-            }
+            LERROR("MD logger cleanup failed; pending data may be lost");
         }
     }
 

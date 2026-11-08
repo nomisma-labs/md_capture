@@ -45,7 +45,7 @@ if(nom_build_tests)
     nom_find_catch2()
 endif()
 
-add_subdirectory(core)
+add_subdirectory(src)
 
 if(nom_build_apps)
     add_subdirectory(apps)

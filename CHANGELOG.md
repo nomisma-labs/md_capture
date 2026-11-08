@@ -19,6 +19,14 @@ and versions follow [Semantic Versioning](https://semver.org); how to release:
 
 ### Changed
 
+- Use no-throw `LERROR` from `spd_logger v0.8.0` for MD logger cleanup, removing the
+  temporary catch around the diagnostic.
+
+- Move library sources from `core/` to `src/` and synchronize the shared build kit with
+  `cmake_template v0.13.0`; module names, CMake targets and installed paths remain unchanged.
+- Pin `base v0.4.0`, `assembly v0.5.0`, `spd_logger v0.8.0`, `json_config v0.6.0` and
+  `asio_comm v0.3.1`, align recursive dependencies and update installed-package requirements.
+
 - Export the MD logger's JSON mapping from its module and declare `json_config` as a public
   build/package dependency. Keep OKX subscription construction in application code and use
   standard uppercase conversion for symbols.
@@ -34,7 +42,7 @@ and versions follow [Semantic Versioning](https://semver.org); how to release:
 - Collect capture documentation under `docs/md_capture/` and add the MD logger guide.
 - Reuse a local copy of the `asio_comm` feeder's I/O and termination nodes in `okx_md_capture`;
   keep writer ownership and storage health monitoring in the capture sink.
-- Pin `json_config` v0.5.0 and `spd_logger` v0.6.0. Map application log levels and configs
+- Map application log levels and configs
   with `NOM_JCONFIG_ENUM` and `NOM_JCONFIG`, preserving the default `info` level. Accept
   lowercase names and uppercase aliases, with lowercase serialization and strict rejection
   of other spellings and values. Use generated help, short aliases, and `full`, `view`,

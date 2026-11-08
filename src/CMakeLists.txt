@@ -6,4 +6,4 @@
 add_subdirectory(md_logger)
 add_subdirectory(md_logger_ai)
 
-nom_install_package(TARGETS md_logger md_logger_ai DEPENDENCIES base json_config spd_logger Threads nlohmann_json)
+nom_install_package(TARGETS md_logger md_logger_ai DEPENDENCIES "base 0.4" "json_config 0.6" "spd_logger 0.8" Threads nlohmann_json)

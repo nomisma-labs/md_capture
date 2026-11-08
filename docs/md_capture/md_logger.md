@@ -7,8 +7,8 @@ It has no symbol/channel table, channel distribution, inheritance or per-symbol 
 
 Import `nom.md_logger` and link `nom::md_logger`. Applications also link `nom::spd_logger`
 to initialize the application logger. Public declarations and private state are in
-[md_logger.cppm](../../core/md_logger/md_logger.cppm); function definitions and POSIX file I/O
-are in [md_logger.cpp](../../core/md_logger/md_logger.cpp). There is no implementation header.
+[md_logger.cppm](../../src/md_logger/md_logger.cppm); function definitions and POSIX file I/O
+are in [md_logger.cpp](../../src/md_logger/md_logger.cpp). There is no implementation header.
 
 The repository installs a CMake package named `md_capture` with two separate targets:
 `nom::md_logger` and `nom::md_logger_ai`. Link only the writer you use. The OKX app links
@@ -45,9 +45,9 @@ calls and use after destruction are outside the contract. `stop()` can throw on 
 pending buffer allocation or joining errors. The destructor catches these exceptions, requests stop,
 and lets `std::jthread` join before worker state is destroyed. It reports an exceptional cleanup
 through `LERROR` on the lifecycle owner's thread. Initialize `nom::main_logger` before creating
-the MD logger and keep it available through destruction. A temporary catch protects against
-logging exceptions until no-throw `LERROR` and `LALWAYS` variants are available. Records in the
-pending buffer may be lost if their transfer failed; call `stop()` explicitly to observe shutdown errors.
+the MD logger and keep it available through destruction. `LERROR` contains logging exceptions
+and falls back to stderr. Records in the pending buffer may be lost if their transfer failed;
+call `stop()` explicitly to observe shutdown errors.
 
 The writer is owned by `std::jthread` and receives its `std::stop_token`. A stop-aware
 `std::condition_variable_any` wakes immediately when stop is requested. `stop()` transfers

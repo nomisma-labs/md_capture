@@ -91,6 +91,14 @@ extern "C" ssize_t wrap_write(int descriptor, const void* data, size_t count)
 
 namespace
 {
+    struct logger_fixture
+    {
+        logger_fixture()
+        {
+            nom::init_logger(nom::main_logger);
+        }
+    };
+
     struct temporary_directory
     {
         std::filesystem::path path = std::filesystem::temp_directory_path() /
@@ -141,7 +149,7 @@ namespace
     }
 } // namespace
 
-TEST_CASE("Logger owns payloads and appends the agreed textual format to one file")
+TEST_CASE_METHOD(logger_fixture, "Logger owns payloads and appends the agreed textual format to one file")
 {
     temporary_directory temporary;
     const auto path = temporary.path / "nested/md.log";
@@ -170,7 +178,7 @@ TEST_CASE("Logger owns payloads and appends the agreed textual format to one fil
                         std::filesystem::directory_iterator{}) == 1);
 }
 
-TEST_CASE("An empty logger creates no output and destruction drains accepted messages")
+TEST_CASE_METHOD(logger_fixture, "An empty logger creates no output and destruction drains accepted messages")
 {
     temporary_directory temporary;
     const auto path = temporary.path / "md.log";
@@ -193,7 +201,7 @@ TEST_CASE("An empty logger creates no output and destruction drains accepted mes
     CHECK(contents(path) == "1234 {}\n1234 {}\n");
 }
 
-TEST_CASE("Destruction requests stop and joins when ordinary shutdown throws")
+TEST_CASE_METHOD(logger_fixture, "Destruction requests stop and joins when ordinary shutdown throws")
 {
     temporary_directory temporary;
     const auto path = temporary.path / "md.log";
@@ -215,7 +223,7 @@ TEST_CASE("Destruction requests stop and joins when ordinary shutdown throws")
     nom::init_logger(nom::main_logger);
 }
 
-TEST_CASE("Destruction drains a final pending buffer after the shared queue")
+TEST_CASE_METHOD(logger_fixture, "Destruction drains a final pending buffer after the shared queue")
 {
     temporary_directory temporary;
     const auto path = temporary.path / "md.log";
@@ -232,7 +240,7 @@ TEST_CASE("Destruction drains a final pending buffer after the shared queue")
     CHECK(contents(path) == "1234 first\n1234 second\n");
 }
 
-TEST_CASE("Flush threshold and timer both make progress before stop")
+TEST_CASE_METHOD(logger_fixture, "Flush threshold and timer both make progress before stop")
 {
     temporary_directory temporary;
     SECTION("record threshold")
@@ -255,7 +263,7 @@ TEST_CASE("Flush threshold and timer both make progress before stop")
     }
 }
 
-TEST_CASE("The producer makes progress while filesystem writes are blocked")
+TEST_CASE_METHOD(logger_fixture, "The producer makes progress while filesystem writes are blocked")
 {
     temporary_directory temporary;
     const nom::md_logger_config config{.file = {(temporary.path / "md.log").string()}, .flush_records = {1}};
@@ -275,7 +283,7 @@ TEST_CASE("The producer makes progress while filesystem writes are blocked")
     CHECK(contents(logger.file()) == "1234 {\"n\":1}\n1234 {\"n\":2}\n");
 }
 
-TEST_CASE("A busy queue uses the pending buffer and preserves acceptance order")
+TEST_CASE_METHOD(logger_fixture, "A busy queue uses the pending buffer and preserves acceptance order")
 {
     temporary_directory temporary;
     const nom::md_logger_config config{.file = {(temporary.path / "md.log").string()}, .flush_ms = {60000}};
@@ -310,7 +318,7 @@ TEST_CASE("A busy queue uses the pending buffer and preserves acceptance order")
     CHECK(logger.stats().flushed_messages == expected_messages);
 }
 
-TEST_CASE("Interrupted and short writes preserve exact output")
+TEST_CASE_METHOD(logger_fixture, "Interrupted and short writes preserve exact output")
 {
     temporary_directory temporary;
     const nom::md_logger_config config{.file = {(temporary.path / "md.log").string()}};
@@ -321,7 +329,7 @@ TEST_CASE("Interrupted and short writes preserve exact output")
     CHECK(contents(logger.file()) == "1234 {\"v\":\"payload\"}\n");
 }
 
-TEST_CASE("A recoverable write failure resumes at the unwritten suffix")
+TEST_CASE_METHOD(logger_fixture, "A recoverable write failure resumes at the unwritten suffix")
 {
     temporary_directory temporary;
     const nom::md_logger_config config{.file = {(temporary.path / "md.log").string()}};
@@ -333,7 +341,7 @@ TEST_CASE("A recoverable write failure resumes at the unwritten suffix")
     CHECK(contents(logger.file()) == "1234 {\"v\":\"payload\"}\n");
 }
 
-TEST_CASE("Persistent and zero-progress writes exhaust retries without duplicating the prefix")
+TEST_CASE_METHOD(logger_fixture, "Persistent and zero-progress writes exhaust retries without duplicating the prefix")
 {
     for (const int mode : {3, 4})
     {
@@ -353,7 +361,7 @@ TEST_CASE("Persistent and zero-progress writes exhaust retries without duplicati
     }
 }
 
-TEST_CASE("Open failures are observable during feed silence")
+TEST_CASE_METHOD(logger_fixture, "Open failures are observable during feed silence")
 {
     temporary_directory temporary;
     const auto path = temporary.path / "md.log";
@@ -366,7 +374,7 @@ TEST_CASE("Open failures are observable during feed silence")
     CHECK(logger.error()->find("open MD log") != std::string::npos);
 }
 
-TEST_CASE("Invalid file and flush settings fail before creating output")
+TEST_CASE_METHOD(logger_fixture, "Invalid file and flush settings fail before creating output")
 {
     temporary_directory temporary;
     const auto path = temporary.path / "md.log";
@@ -379,7 +387,7 @@ TEST_CASE("Invalid file and flush settings fail before creating output")
     CHECK_FALSE(std::filesystem::exists(temporary.path));
 }
 
-TEST_CASE("MD logger exports its JSON config mapping", "[md_logger]")
+TEST_CASE_METHOD(logger_fixture, "MD logger exports its JSON config mapping", "[md_logger]")
 {
     nom::md_logger_config config{.file = {"capture.txt"}};
     const nlohmann::json partial{{"file", "capture.txt"}, {"flush_records", 8}, {"flush_ms", nullptr}};

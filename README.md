@@ -38,11 +38,11 @@ use these same selected versions.
 
 | Repository | Pin | Purpose |
 | --- | --- | --- |
-| `base` | `v0.3.0` | Common types, configuration types and utilities |
-| `assembly` | `v0.4.0` | Component composition and synchronous event routing |
-| `spd_logger` | `v0.5.0` | Operational logging |
-| `asio_comm` | `v0.2.0` | TLS WebSocket, asynchronous HTTPS and timers |
-| `json_config` | `v0.4.0` | JSON loading, validation, overrides and configuration generation |
+| `base` | `v0.4.0` | Common types, configuration types and utilities |
+| `assembly` | `v0.5.0` | Component composition and synchronous event routing |
+| `spd_logger` | `v0.8.0` | Operational logging |
+| `asio_comm` | `v0.3.1` | TLS WebSocket, asynchronous HTTPS and timers |
+| `json_config` | `v0.6.0` | JSON loading, validation, overrides and configuration generation |
 
 Recursive submodules provide Metal, fmt, spdlog and nlohmann/json. Boost and OpenSSL are
 system dependencies; the shared kit discovers Boost, and `asio_comm` discovers OpenSSL and
@@ -68,8 +68,8 @@ for capture and archive inspection commands.
 ## Layout and development
 
 - [apps/](apps/README.md): exchange applications under `apps/<exchange>/<app>/` as they are added.
-- `core/md_logger/`: the `nom.md_logger` module and `md_logger`.
-- `core/md_logger_ai/`: the independent `nom.md_logger_ai` module and `md_logger_ai`.
+- `src/md_logger/`: the `nom.md_logger` module and `md_logger`.
+- `src/md_logger_ai/`: the independent `nom.md_logger_ai` module and `md_logger_ai`.
 - `tests/unit/` and `tests/integration/`: storage, configuration and local TLS capture checks.
 - `external/`: pinned component repositories.
 - [docs/md_capture/](docs/md_capture/README.md): logger documentation and capture design.

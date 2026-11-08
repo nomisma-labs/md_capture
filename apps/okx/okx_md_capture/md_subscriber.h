@@ -4,6 +4,7 @@
 #pragma once
 
 #include "app_events.h"
+#include "compiler_workarounds.h"
 #include "feed_events.h"
 
 #include <json_config/config.h>
@@ -64,6 +65,8 @@ namespace okx
         using relay = nom::relay<Traits>;
 
     public:
+        // config_owner constructs and validates the context before nodes; GCC 16 loses that ordering here.
+        NOM_GCC16_IGNORE_BEGIN("-Wmaybe-uninitialized")
         md_subscriber()
             : request_(make_subscription(nom::ctx(this).cfg().md_subscriber.subscription)),
               client_(nom::ctx(this).io.get_executor(),
@@ -71,6 +74,7 @@ namespace okx
               heartbeat_(nom::ctx(this).io.get_executor())
         {
         }
+        NOM_GCC16_IGNORE_END
 
         void on_request(nom::event::app_start event)
         {
