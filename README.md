@@ -17,7 +17,7 @@ operating guides and improvement plans.
 
 ## Dependencies
 
-[`asio_comm`](external/asio_comm/README.md) (`v0.6.0`) is the sole direct repository dependency,
+[`asio_comm`](external/asio_comm/README.md) (`v0.6.1`) is the sole direct repository dependency,
 pinned at `external/asio_comm`. It supplies communication services and brings `nom_core`
 transitively for core facilities.
 

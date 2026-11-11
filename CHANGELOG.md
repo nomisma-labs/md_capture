@@ -25,9 +25,10 @@ and versions follow [Semantic Versioning](https://semver.org); how to release:
   and record the repository's license selection in `project_license.json`.
 - Include the project license in installed artifacts alongside the applicable MIT kit notices.
 
-- Pin `asio_comm v0.6.0` as the sole direct repository dependency, obtaining `nom_core v0.3.0`
-  through its dependency bundle. Replace separate core module imports and component links with
-  `nom.core` / `nom::core`, and require `nom_core 0.3` in the installed MD logger package.
+- Pin `asio_comm v0.6.1` as the sole direct repository dependency, obtaining `nom_core v0.3.1`
+  through its dependency bundle. All base pins use the clean-history `base v0.6.0` release.
+  Replace separate core module imports and component links with `nom.core` / `nom::core`,
+  and require `nom_core 0.3` in the installed MD logger package.
 - Use the logging JSON mappings exported by `nom.core` and remove the OKX app's local
   `log_config.h`; logging configuration keys, defaults and accepted level names stay the same.
 
