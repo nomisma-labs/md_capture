@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-# SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+# SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 """Exercise JSON configuration, TLS capture, shutdown and readable archive output locally."""
 
@@ -80,19 +80,17 @@ def run_case(client, root, context, certificate, reader, case, reader_path):
         listener.listen(1)
         listener.settimeout(8)
         port = listener.getsockname()[1]
-        app_log = root / 'capture_app.log'
+        app_log = root / f'{case}_app.log'
         settings = {
             'md_subscriber': {
                 'connection': {'endpoint': f'wss://localhost:{port}/feed', 'heartbeat_sec': 1},
                 'subscription': {'symbols': ['btc-usdt', 'ETH-USDT'], 'channels': ['trades']}},
-            'exit_after_sec': 0 if case == 'zero' else 1 if case == 'flush_error' else 3,
-            'health_checker': {'period_msec': 50},
+            'app_control': {'exit_after_sec': 1 if case == 'flush_error' else 3,
+                            'health_check_period_msec': 50},
             'md_sink': {'md_logger': {'file': str(root / 'unused_output'),
-                                      'flush_ms': 60000 if case in ('signal', 'flush_error') else 10}}}
-        if case == 'capture':
+                                      'flush_ms': 60000 if case in ('signal', 'flush_error', 'flush_signal') else 10}}}
+        if case in ('capture', 'flush_signal'):
             settings['log'] = {'file': {'name': str(app_log)}}
-        elif case == 'zero':
-            settings['log'] = {'level': 'error'}
         config.write_text(json.dumps(settings))
         if case in ('storage_error', 'flush_error'):
             output.mkdir(parents=True)  # An output directory makes open-for-append fail.
@@ -107,9 +105,6 @@ def run_case(client, root, context, certificate, reader, case, reader_path):
                     raw.settimeout(8)
                     with context.wrap_socket(raw, server_side=True) as connection:
                         upgrade(connection)
-                        if case == 'zero':
-                            assert connection.recv(1) == b''
-                            return
                         opcode, subscription = receive(connection)
                         assert opcode == 1
                         assert json.loads(subscription) == {'op': 'subscribe', 'args': [
@@ -145,20 +140,32 @@ def run_case(client, root, context, certificate, reader, case, reader_path):
         if case == 'signal':
             assert ready.wait(8)
             process.send_signal(signal.SIGTERM)
+        elif case == 'flush_signal':
+            assert ready.wait(8) and not errors, errors
+            process.send_signal(signal.SIGQUIT)
+            deadline = time.monotonic() + 2
+            while 'Connected:' not in app_log.read_text():
+                assert process.poll() is None, 'SIGQUIT stopped capture'
+                assert time.monotonic() < deadline, 'SIGQUIT did not flush the application log'
+                time.sleep(0.01)
+            assert process.poll() is None, 'flush must leave capture running'
+            # A second flush and a later stop exercise signal-wait rearming.
+            process.send_signal(signal.SIGQUIT)
+            time.sleep(0.05)
+            assert process.poll() is None, 'a repeated SIGQUIT stopped capture'
+            process.send_signal(signal.SIGINT)
         stdout, stderr = process.communicate(timeout=12)
         assert not (root / 'unused_output').exists(), 'string override was not applied'
         worker.join(9)
         assert not worker.is_alive(), case
         assert not errors, (case, errors, stdout, stderr)
-        assert process.returncode == (1 if case in ('disconnect', 'missing_pong', 'storage_error', 'flush_error') else 0), (case, stdout, stderr)
+        assert process.returncode == (1 if case in ('disconnect', 'missing_pong', 'storage_error', 'flush_error', 'signal') else 0), (case, stdout, stderr)
         finished_us = time.time_ns() // 1000
         if case == 'capture':
             assert stdout == '' and stderr == '', (stdout, stderr)
             operational_log = app_log.read_text()
             assert 'Connected:' in operational_log and 'Capture stopped:' in operational_log, operational_log
             assert 'BTC-USDT' not in operational_log and '"px"' not in operational_log
-        elif case == 'zero':
-            assert stdout == '' and stderr == '', 'configured log level must suppress INFO messages'
         if case in ('storage_error', 'flush_error'):
             assert output.is_dir()
             if case == 'flush_error':
@@ -166,10 +173,6 @@ def run_case(client, root, context, certificate, reader, case, reader_path):
                 assert 'MD logger failed:' not in stdout + stderr, 'failure must first occur during stop'
             else:
                 assert 'MD logger failed:' in stdout + stderr, (stdout, stderr)
-            print(f'{case}: passed')
-            return
-        if case == 'zero':
-            assert not output.exists(), (case, stdout, stderr)
             print(f'{case}: passed')
             return
         assert output.is_file(), (case, stdout, stderr)
@@ -223,6 +226,32 @@ def run_case(client, root, context, certificate, reader, case, reader_path):
         print(f'{case}: passed')
 
 
+def check_unconnected_runtime_limit(client, root):
+    # TCP may connect, but no accept/TLS response is supplied. The runtime limit must
+    # terminate the app independently of connection success, including a zero limit.
+    for seconds in (0, 1):
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+            output = root / f'limit_{seconds}.txt'
+            config = root / f'limit_{seconds}.json'
+            config.write_text(json.dumps({
+                'app_control': {'exit_after_sec': seconds, 'health_check_period_msec': 0},
+                'md_subscriber': {'connection': {'endpoint': f'wss://127.0.0.1:{port}/feed'},
+                                  'subscription': {'symbols': ['BTC-USDT']}},
+                'md_sink': {'md_logger': {'file': str(output)}},
+                'log': {'level': 'error'}}))
+            started = time.monotonic()
+            result = subprocess.run([client, '-c', str(config)], capture_output=True, text=True, timeout=5)
+            elapsed = time.monotonic() - started
+            assert result.returncode == 0, result
+            assert result.stdout == '' and result.stderr == '', result
+            assert elapsed >= seconds, elapsed
+            assert not output.exists(), 'unconnected runtime limit must not create capture data'
+    print('unconnected runtime limits: passed')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--client', required=True)
@@ -258,12 +287,12 @@ def main():
                 assert normalized['md_subscriber']['connection'] == {
                     'endpoint': 'wss://ws.okx.com/ws/v5/public', 'heartbeat_sec': 20}, normalized
                 assert normalized['md_sink']['md_logger']['file'] == str(side_effect), normalized
-                assert normalized['md_sink']['md_logger']['flush_records'] == 4096, normalized
-                assert normalized['health_checker'] == {'period_msec': 2000}, normalized
+                assert normalized['md_sink']['md_logger']['flush_records'] == 16384, normalized
+                assert normalized['app_control'] == {
+                    'exit_after_sec': None, 'health_check_period_msec': 2000}, normalized
                 assert set(normalized['md_sink']) == {'md_logger'}, normalized
                 assert normalized['log'] == {'level': 'info', 'file': {
                     'name': str(root / 'must_not_log'), 'rotation_size': None}}, normalized
-                assert normalized['exit_after_sec'] is None, normalized
             assert not side_effect.exists() and not (root / 'must_not_log').exists()
         # --set updates existing JSON paths; materialize defaults before overriding those paths.
         config.write_text(json.dumps(normalized))
@@ -276,8 +305,8 @@ def main():
             assert checked.returncode == 0 and checked.stderr == '', checked
             normalized = json.loads(checked.stdout)
             assert normalized['md_sink']['md_logger'] == {
-                'file': str(side_effect), 'flush_records': 4096,
-                'flush_ms': writer.get('flush_ms') or 200}, normalized
+                'file': str(side_effect), 'flush_records': 16384,
+                'flush_ms': writer.get('flush_ms') or 2000}, normalized
             assert normalized['log'] == {'level': 'info', 'file': None}, normalized
             nested.write_text(checked.stdout)
             roundtrip = subprocess.run([args.client, '-c', str(nested), '-k', 'view'],
@@ -288,22 +317,24 @@ def main():
                                         capture_output=True, text=True, timeout=5)
             normalized['md_sink']['md_logger']['flush_records'] = 8
             assert overridden.returncode == 0 and json.loads(overridden.stdout) == normalized, overridden
-        for health in [{}, {'period_msec': None}, {'period_msec': 0}, {'period_msec': 25}, {'period_msec': 60000}]:
-            nested = root / 'health_defaults.json'
+        for control in [{}, {'health_check_period_msec': None}, {'health_check_period_msec': 0},
+                        {'health_check_period_msec': 25}, {'health_check_period_msec': 60000}]:
+            nested = root / 'control_defaults.json'
             nested.write_text(json.dumps({**minimal, 'md_sink': {'md_logger': {'file': str(side_effect)}},
-                                          'health_checker': health}))
+                                          'app_control': control}))
             checked = subprocess.run([args.client, '-c', str(nested), '--check-config=view'],
                                      capture_output=True, text=True, timeout=5)
             assert checked.returncode == 0 and checked.stderr == '', checked
-            period = health.get('period_msec')
-            assert json.loads(checked.stdout)['health_checker'] == {
-                'period_msec': 2000 if period is None else period}, checked
+            period = control.get('health_check_period_msec')
+            assert json.loads(checked.stdout)['app_control'] == {
+                'exit_after_sec': None, 'health_check_period_msec': 2000 if period is None else period}, checked
         for period in [0, 25]:
             checked = subprocess.run([args.client, '-c', str(config), '--set',
-                                      f'/health_checker/period_msec={period}', '--check-config=view'],
+                                      f'/app_control/health_check_period_msec={period}', '--check-config=view'],
                                      capture_output=True, text=True, timeout=5)
             assert checked.returncode == 0 and checked.stderr == '', checked
-            assert json.loads(checked.stdout)['health_checker'] == {'period_msec': period}, checked
+            assert json.loads(checked.stdout)['app_control'] == {
+                'exit_after_sec': None, 'health_check_period_msec': period}, checked
         for level in ['debug', 'info', 'warn', 'error', 'always', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'ALWAYS', None]:
             checked = subprocess.run([args.client, '-c', str(config), '--set',
                                       '/log/level=' + json.dumps(level), '--set',
@@ -342,11 +373,11 @@ def main():
             '/md_sink/md_logger/flush_records=1.5', '/md_sink/md_logger/flush_records=true',
             '/md_sink/md_logger/flush_ms=0', '/md_sink/md_logger/flush_ms=-1',
             '/md_sink/md_logger/flush_ms=60001', '/md_sink/md_logger/flush_ms=1.5',
-            '/md_sink/md_logger/file=', '/health_checker/period_msec=60001',
-            '/health_checker/period_msec=-1', '/health_checker/period_msec=1.5',
-            '/health_checker/period_msec=18446744073709551615',
+            '/md_sink/md_logger/file=', '/app_control/health_check_period_msec=60001',
+            '/app_control/health_check_period_msec=-1', '/app_control/health_check_period_msec=1.5',
+            '/app_control/health_check_period_msec=18446744073709551615',
             '/log/level=unknown', '/log/level=Info', '/log/level=1', '/log/level=true', '/log/file/name=',
-            '/log/file/rotation_size=0', '/log/file/rotation_size=-1', '/exit_after_sec=86401']
+            '/log/file/rotation_size=0', '/log/file/rotation_size=-1', '/app_control/exit_after_sec=86401']
         for override in invalid_overrides:
             invalid = subprocess.run([args.client, '-c', str(config), '--set', override, '--check-config'],
                                      capture_output=True, text=True, timeout=5)
@@ -355,7 +386,7 @@ def main():
         for override, path in [('/md_subscriber/connection/heartbeat_sec=0',
                                 '/md_subscriber/connection/heartbeat_sec'),
                                ('/md_sink/md_logger/flush_ms=0', '/md_sink/md_logger:'),
-                               ('/health_checker/period_msec=60001', '/health_checker/period_msec'),
+                               ('/app_control/health_check_period_msec=60001', '/app_control/health_check_period_msec'),
                                ('/log/file/name=', '/log/file/name')]:
             invalid = subprocess.run([args.client, '-c', str(config), '--set', override, '-k'],
                                      capture_output=True, text=True, timeout=5)
@@ -371,13 +402,14 @@ def main():
                                   capture_output=True, text=True, timeout=5)
         assert rejected.returncode != 0 and 'Subscription exceeds 64 KiB' in rejected.stderr, rejected
         assert not side_effect.exists()
+        check_unconnected_runtime_limit(args.client, root)
         certificate, key = root / 'cert.pem', root / 'key.pem'
         subprocess.run([args.openssl, 'req', '-x509', '-newkey', 'rsa:2048', '-noenc', '-keyout', str(key),
                         '-out', str(certificate), '-days', '1', '-subj', '/CN=localhost',
                         '-addext', 'subjectAltName=DNS:localhost'], check=True, capture_output=True)
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(certificate, key)
-        for case in ['capture', 'disconnect', 'missing_pong', 'signal', 'zero', 'storage_error', 'flush_error']:
+        for case in ['capture', 'disconnect', 'missing_pong', 'signal', 'flush_signal', 'storage_error', 'flush_error']:
             run_case(args.client, root, context, certificate, reader, case, args.reader)
     return 0
 

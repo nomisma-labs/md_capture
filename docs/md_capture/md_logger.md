@@ -1,11 +1,15 @@
-# MD logger
+# MD logger implementation guide
+
+This guide describes the current one-file logger API. Start with the
+[MD capture reference design](md_capture_reference_design.md) for architecture and the
+[Improvement proposal](improvement_proposal.md) for future package storage.
 
 `nom::md_logger` collects received market-data messages into one configured file. It copies
 messages into an in-memory queue, with a producer-owned pending buffer for contention, and uses one
 writer thread to serialize and append batches.
 It has no symbol/channel table, channel distribution, inheritance or per-symbol files.
 
-Import `nom.md_logger` and link `nom::md_logger`. Applications also link `nom::spd_logger`
+Import `nom.md_logger` and link `nom::md_logger`. Applications also link `nom::core`
 to initialize the application logger. Public declarations and private state are in
 [md_logger.cppm](../../src/md_logger/md_logger.cppm); function definitions and POSIX file I/O
 are in [md_logger.cpp](../../src/md_logger/md_logger.cpp). There is no implementation header.
@@ -19,7 +23,7 @@ The repository installs a CMake package named `md_capture` with two separate tar
 ```cpp
 import std;
 import nom.md_logger;
-import nom.spd_logger;
+import nom.core;
 
 nom::init_logger(nom::main_logger);
 const nom::md_logger_config config{.file = {"data/okx_spot.txt"}};
@@ -67,19 +71,23 @@ The logger also validates its configuration before allocating queue storage or s
 | `md_logger_config` field | Default | Meaning |
 | --- | --- | --- |
 | `file` | Required | One output path, relative to the process working directory unless absolute |
-| `flush_records` | `4096` | Wake the writer when the queued buffer reaches this many messages |
-| `flush_ms` | `200` | Maximum normal wait in milliseconds before flushing a smaller shared buffer |
+| `flush_records` | `16384` | Wake the writer when the queued buffer reaches this many messages |
+| `flush_ms` | `2000` | Writer wait in milliseconds for a smaller shared buffer; excludes producer-pending records and I/O delay |
 
 `flush_records` must be positive; `flush_ms` must be in 1..60000. The record threshold is a batching trigger, **not a
 capacity limit**. The queue may grow while storage is slow; this implementation does not drop
 messages or impose a backlog limit. The interval does not bound filesystem or retry delays.
 
 `md_logger_config` uses `base`'s config types and owns its validation. `file` is required; the
-flush settings use `cfg_defaulted`. Its `NOM_JCONFIG` mapping is exported from `nom.md_logger`, which depends publicly on `json_config`.
-The mapping macro comes from `<json_config/config.h>`; its helpers require
-`import nom.json_config;` in the module interface. Consumers can use `md_logger_config` without
-another import; code that names `nom::cfg_*` types directly should import `nom.config_types`
-or `nom.json_config` too.
+flush settings use `cfg_defaulted`. Its `NOM_JCONFIG` mapping is exported from `nom.md_logger`,
+which publicly links `nom::core`. The mapping macro comes from `<json_config/config.h>`;
+`import nom.core;` supplies its helpers in the module interface. Consumers can use
+`md_logger_config` through `nom.md_logger`; code that names the core configuration or logging
+APIs directly imports `nom.core` too.
+
+The interface contains a GCC 16 compatibility guard that loads the core logging configuration
+before declaring the MD configuration. This avoids a compiler failure when importing the
+compiled module; it does not change configuration or runtime behavior.
 
 The [OKX sink config](../../apps/okx/okx_md_capture/md_sink.h) embeds `md_logger_config`.
 The [application config](../../apps/okx/okx_md_capture/main.cpp) exposes it at `md_sink.md_logger`,
@@ -87,7 +95,7 @@ and the sink passes it straight to the logger constructor.
 
 The JSON keys are `md_sink.md_logger.file`, `md_sink.md_logger.flush_records` and
 `md_sink.md_logger.flush_ms`. Missing or null flush settings preserve their initialized defaults.
-`file` must be present and nonempty; the sample app config explicitly sets `data/okx_spot.txt`.
+`file` must be present and nonempty; the sample app config explicitly sets `data/okx_spot.dat`.
 Both configuration checking and the logger constructor call `md_logger_config::validate()`.
 
 ## Queue and thread ownership
@@ -161,23 +169,30 @@ new messages arrive.
 Accepted data that was not successfully flushed remains reflected in the counters; `stop()`
 does not replay a failed batch. The OKX capture sink checks this status on each
 `nom::event::app_health_check` and requests application shutdown on failure. It forwards the health
-check to downstream handlers even when it reports failure. The `nom::health_checker`
-assembly node emits these events at `health_checker.period_msec` (2000 ms by default;
-0 disables periodic checks). The writer is a private member of that sink. On `nom::event::app_stop`,
-the sink stops the subscriber first, then drains its writer and reports any final-flush error to
-the terminator. The top-level app never operates on the writer directly.
+check to downstream handlers even when it reports failure. The `nom::app_control`
+assembly node emits these events at `app_control.health_check_period_msec` (2000 ms by default;
+0 disables periodic checks). The sink creates its private writer on each accepted
+`nom::event::app_start`, before starting the subscriber. Each run has fresh counters and appends
+to the same configured file. On `nom::event::app_stop`, the sink stops the subscriber first,
+then drains its writer and reports any final-flush error through `nom::event::app_failed` to
+`app_control`. The top-level app never operates on the writer directly.
+
+Ctrl-\ (`SIGQUIT`) flushes the operational application log only. It does not request an
+MD-writer flush or change its batching and shutdown behavior.
 
 ## Other implementation and verification
 
 Import `nom.md_logger_ai` and link `nom::md_logger_ai` for `nom::md_logger_ai`. It owns
 `md_logger_ai_config`, `md_logger_ai_stats`, `capture_result` and its input type `capture_event_ai`.
-`nom.md_logger` owns `capture_event` for `md_logger`; the two event types have the same timestamp
+`nom.md_logger` owns `nom::event::market_data` for `md_logger`; the two event types have the same timestamp
 and payload fields but are independent, so both modules can be imported together. Each writer
 has its own unit suite.
 
 `md_logger_ai` provides bounded queues, rotating segments, temporary-file publication and
-metadata; its API remains `append()` / `finish()`. It is not selected by the OKX app. Its storage
-contract and broader capture proposals are in the [design proposal](design_proposal.md).
+metadata; its API remains `append()` / `finish()`. It is not selected by the OKX app.
+Its independent implementation and tests remain available for experimentation. Future package
+storage follows the [Improvement proposal](improvement_proposal.md), whose calendar-only rotation
+and shared-folder coordination have not yet been implemented in the current app.
 
 Unit tests cover byte ownership, append behavior, batching, shutdown, pending buffer ordering and draining,
 producer progress during blocked writes, short/interrupted/zero writes and retry failures.

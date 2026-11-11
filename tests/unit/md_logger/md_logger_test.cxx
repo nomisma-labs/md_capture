@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-// SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+// SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 #include <json_config/nlohmann_json.h>
 
@@ -10,7 +10,7 @@
 
 import std;
 import nom.md_logger;
-import nom.spd_logger;
+import nom.core;
 
 using namespace std::chrono_literals;
 
@@ -129,7 +129,7 @@ namespace
         }
     };
 
-    nom::capture_event event(std::string_view content)
+    nom::event::market_data event(std::string_view content)
     {
         return {std::chrono::system_clock::time_point{1234567ns}, content};
     }
@@ -392,7 +392,7 @@ TEST_CASE_METHOD(logger_fixture, "MD logger exports its JSON config mapping", "[
     nom::md_logger_config config{.file = {"capture.txt"}};
     const nlohmann::json partial{{"file", "capture.txt"}, {"flush_records", 8}, {"flush_ms", nullptr}};
     partial.get_to(config);
-    const nlohmann::json expected{{"file", "capture.txt"}, {"flush_records", 8}, {"flush_ms", 200}};
+    const nlohmann::json expected{{"file", "capture.txt"}, {"flush_records", 8}, {"flush_ms", 2000}};
     REQUIRE(nlohmann::json(config) == expected);
     REQUIRE(config.validate().has_value());
 }

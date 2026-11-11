@@ -3,7 +3,7 @@
 `okx_md_capture` captures OKX Spot WebSocket messages through `asio_comm`, composes the app
 with Assembly/relay, loads JSON settings with `json_config`, and writes one ordered capture
 stream through `nom::md_logger` from the `nom.md_logger` module. Operational logs contain status and counters, not raw payloads.
-It is the first implementation of the [capture design](../../../docs/md_capture/design_proposal.md).
+It is the current implementation described by the [MD capture reference design](../../../docs/md_capture/md_capture_reference_design.md).
 
 ## Build and run
 
@@ -14,7 +14,7 @@ cmake --workflow --preset dev
 mkdir -p data
 build/dev/bin/okx_md_capture --config build/dev/config/okx_md_capture/okx_md_capture.json --check-config
 build/dev/bin/okx_md_capture --config build/dev/config/okx_md_capture/okx_md_capture.json \
-    --set /exit_after_sec=10
+    --set /app_control/exit_after_sec=10
 ```
 
 ## Configuration
@@ -24,9 +24,9 @@ Configuration follows the assembly nodes:
 - `log` configures the application's operational logger (`nom::log_config`).
 - `md_subscriber.connection` configures the endpoint and heartbeat.
 - `md_subscriber.subscription` selects symbols and channels.
-- `health_checker.period_msec` controls the shared health-check period.
+- `app_control.health_check_period_msec` controls the shared health-check period.
 - `md_sink.md_logger` configures capture storage.
-- `exit_after_sec` remains an application setting used by the terminator.
+- `app_control.exit_after_sec` sets the optional runtime limit from `app_start`, including connection setup.
 
 Symbols and the capture file are required. The smallest config is:
 
@@ -70,17 +70,18 @@ of `--config FILE`. Unknown arguments and invalid config fail.
 | `md_subscriber.subscription.symbols` | Required | Nonempty Spot instrument IDs; normalized to uppercase; duplicates rejected |
 | `md_subscriber.subscription.channels` | `["tickers","trades","books"]` | Nonempty API-native channel names |
 | `md_sink.md_logger.file` | Required | One file to append capture data to, relative to the working directory |
-| `md_sink.md_logger.flush_records` | `4096` | Queued-message threshold that wakes the writer; not a capacity limit |
-| `md_sink.md_logger.flush_ms` | `200` | Flush a smaller buffer after this wait; 1..60000 milliseconds |
-| `health_checker.period_msec` | `2000` | Period between shared health-check events; 0..60000 milliseconds; 0 disables checks |
-| `exit_after_sec` | `null` | Unlimited; 0 stops on connection; positive seconds start at connection |
+| `md_sink.md_logger.flush_records` | `16384` | Queued-message threshold that wakes the writer; not a capacity limit |
+| `md_sink.md_logger.flush_ms` | `2000` | Writer wait for the shared buffer; excludes producer-pending records and I/O delay; 1..60000 milliseconds |
+| `app_control.health_check_period_msec` | `2000` | Period between shared health-check events; 0..60000 milliseconds; 0 disables checks |
+| `app_control.exit_after_sec` | `null` | Unlimited; seconds from each accepted `app_start`; 0 schedules immediate asynchronous expiry, including during start delivery |
 
 For file-based operational logging, set `log.file` to
 `{"name":"logs/okx_md_capture.log","rotation_size":10485760}`. Omit `rotation_size` to append
 without rotation. This logger receives status messages and counters; received market data goes
-to `md_sink.md_logger.file`. JSON adapters for the existing `spd_logger` types live in the
-application's [log_config.h](log_config.h), using `NOM_JCONFIG_ENUM` for levels and
-`NOM_JCONFIG` for both logger config structures. Level matching is exact: use the listed
+to `md_sink.md_logger.file`. JSON adapters for the `spd_logger` types are exported by
+`nom.core`, including the level enum and both logger configuration structures; see the
+[core configuration guide](../../../external/asio_comm/external/nom_core/docs/nom_core/README.md#logging-configuration).
+The app supplies only its own configuration mappings. Level matching is exact: use the listed
 lowercase names or their all-uppercase aliases; mixed-case names are rejected. Config checks
 serialize levels as lowercase. Omitted or null levels retain the default `info`.
 
@@ -110,8 +111,17 @@ python3 tools/md_capture/read_capture.py data/okx_spot.txt
 python3 tools/md_capture/read_capture.py --recover data/okx_spot.txt
 ```
 
-SIGINT/SIGTERM and the optional runtime limit send `nom::event::app_stop`. The sink forwards
-it to stop transport work, then drains and joins the writer. Remaining I/O callbacks drain afterward. Success exits 0; transport failures, missing pong and writer failures exit 1.
+Ctrl-\ sends `SIGQUIT`, which flushes the application log without stopping capture. The signal
+handler remains active, so the shortcut can be used repeatedly. This flush applies to the
+operational logger; it does not force a batch from the MD writer or synchronize storage with
+`fsync`.
+
+SIGINT (Ctrl-C), SIGTERM and the optional runtime limit send `nom::event::app_stop`. The sink forwards
+it to stop transport work, then drains and joins the writer. Remaining I/O callbacks drain afterward.
+An explicit stop, `app_finished` response, SIGINT or runtime limit yields `app_status::success` (exit 0).
+By application convention, SIGTERM yields `app_status::failure` (exit 1), while still performing
+normal shutdown. Downstream `app_failed` responses also yield failure, including errors reported during shutdown.
+Once failure is recorded, later successful notifications cannot overwrite it within that run.
 With health checks enabled, storage errors are checked even during feed silence. A successful write/close does not imply
 power-loss durability; this logger does not call `fsync`.
 
@@ -124,8 +134,8 @@ crash guarantees or production throughput.
 
 ## Composition and validation
 
-The app composes `config_owner`, `nom::asio_service`, `nom::app_terminator`, `nom::health_checker`,
-`md_sink` and `md_subscriber`.
+The app composes `config_owner`, `nom::asio_service`, `nom::app_control`, `md_sink` and
+`md_subscriber`.
 [config_owner.h](config_owner.h) copies `Traits::config` into the assembly context and calls
 its `validate() const` before constructing any nodes. The method must return
 `std::expected<void, std::string>`; validation failure throws `std::invalid_argument` with the
@@ -135,55 +145,86 @@ so components can retain references to their configuration sections without copy
 The caller's configuration can be changed or destroyed independently of the assembly.
 
 Each configurable node owns its configuration type and JSON mapping in its header:
-[health_checker.h](health_checker.h), [md_sink.h](md_sink.h) and
+[app_control.h](app_control.h), [md_sink.h](md_sink.h) and
 [md_subscriber.h](md_subscriber.h). The subscriber also owns its connection and subscription
 configuration. [main.cpp](main.cpp) defines `app_config` and combines the nodes through
 `md_capture_assembly`. Its `config` type alias supplies `config_owner` without naming the concrete
-application type in the nodes. `nom::app_terminator`, `health_checker`, `md_sink` and `md_subscriber`
-use default constructors and require `config_owner` in the assembly. Each provides a private
-`cfg()` accessor: capture and health-check nodes select their own section, while the terminator
-reads its application settings. Configuration validation definitions follow the node classes.
+application type in the nodes. `nom::app_control`, `md_sink` and `md_subscriber` use default
+constructors and require `config_owner` in the assembly. Each provides a private `cfg()` accessor
+for its configuration section. Configuration validation definitions follow the node classes.
 
 [asio_service.h](asio_service.h) defines `nom::asio_service`, which provides the I/O context.
-`nom::app_terminator` in [app_terminator.h](app_terminator.h) owns exit status, signals and the runtime limit.
-The terminator comes before every stop handler. [app_events.h](app_events.h) defines the empty
-`nom::event::app_start`, `nom::event::app_stop` and `nom::event::app_health_check` structs.
-Nodes handle each event through a separate `on_request` overload and must forward it with
-`nom::relay<Traits>::pass_request(this, event)`. These are application-wide requests: even a handler
-that triggers shutdown must forward the event already being delivered. Nodes without a matching
-handler are skipped; the sink's lifecycle handler participates only in shutdown. The assembly's
-`event_suppressors` list includes all three events and ends delivery after the last participant.
+`nom::app_control` owns application state, signal handling, the runtime limit and health-check
+scheduling. It comes before every lifecycle handler. Its header defines `nom::app_status`
+through `NOM_ENUM`, with `init`, `starting`, `running`, `stopping`, `success` and `failure` states.
+The controller owns the state privately; the context exposes `status() const noexcept` for
+read-only access. `main.cpp` maps `success` to exit 0 and other results to exit 1 explicitly.
+See [Application control](../../../docs/md_capture/app_control.md) for the state diagram, events
+and transition tables.
 
-`nom::health_checker` owns one timer and sends `nom::event::app_health_check` down the request
-chain every `health_checker.period_msec` milliseconds. A zero period disables health checks
-without blocking application lifecycle events. `nom::event::app_start` schedules the first check after
-one period when enabled; `nom::event::app_stop` cancels the pending check. The next
-tick is armed before dispatch so a handler that triggers shutdown also cancels that tick.
-Checks run synchronously on the application's I/O context and should be short.
+[app_events.h](app_events.h) defines the empty request structs `nom::event::app_start`,
+`nom::event::app_stop` and `nom::event::app_health_check`, plus the response structs
+`nom::event::app_finished` and `nom::event::app_failed`. The responses report application
+completion and failure. The subscriber keeps connection success local; connection and transport
+failures produce `app_failed`.
+
+`app_control` accepts a start from `init`, `success` or `failure`, enters `starting`, arms signal
+waiting and the runtime limit, then forwards start. Signals are handled in both `starting` and
+`running`. The `finalize app_start` step switches on the state left by notification: only
+`starting` becomes `running`, which arms health checks and retains the existing signal wait.
+A reentrant stop/completion/failure is handled immediately; start finalization preserves its
+terminal result. Stop can therefore reach later nodes before the outer start reaches them.
+
+An accepted stop enters `stopping`, cancels timers and signal waiting, and forwards stop.
+Completion and failure responses are consumed by `app_control`. Each handler directly assigns
+its result after stop delivery only if
+`app_status::stopping == status_`. A nested failure changes the state to `failure` immediately
+and is preserved by finalization. There is no separate pending stop result. Reentrant starts in `starting` or
+`stopping` and duplicate stops are ignored. Request a new run after the current notification
+chain returns and the previous run's callbacks have drained.
+
+Callbacks from earlier timer arms and signal waits are ignored. Signal callbacks require the
+I/O loop to run; the OKX app normally processes startup signals after synchronous start delivery.
+Signals not yet dispatched by Asio can be delivered after the event loop resumes. The runtime limit covers start delivery and
+connection setup; connection events neither arm nor reset it. Zero schedules an immediate
+asynchronous stop, which may occur during start if the event loop is serviced then.
+
+Downstream handlers forward accepted application-wide requests with
+`nom::relay<Traits>::pass_request(this, event)`, including a health check that triggers shutdown.
+Nodes without a matching handler are skipped. `app_control` accepts both `app_finished` and
+`app_failed`; neither response propagates to upstream nodes, so no response suppressor is
+needed. The assembly lists the request types in `suppressed_requests`, including `app_finished`
+and `app_failed`; that list only affects dispatch in the request direction.
+
+`nom::app_control` sends `nom::event::app_health_check` down the request chain every
+`app_control.health_check_period_msec` milliseconds. A zero period disables health checks.
+Successful start finalization schedules the first check after one period when enabled;
+`nom::event::app_stop` cancels the pending check. The next tick is armed before dispatch so a
+handler that triggers shutdown also cancels that tick. Checks run synchronously on the
+application's I/O context and should be short.
 
 `md_sink` is the first health-check handler. It checks its private writer's error status and
-relays failures to the terminator, then forwards the health check whether healthy or failed.
+relays failures to `app_control`, then forwards the health check whether healthy or failed.
 Other nodes can participate by defining `on_request(nom::event::app_health_check)` and forwarding
-the event after their check. A failure cancels future ticks, but the current check still reaches
-all downstream participants.
+the event after their check. The subscriber currently forwards these requests without performing
+additional health work. A failure cancels future ticks, but the current check still reaches all
+downstream participants.
 
-[feed_events.h](feed_events.h) defines `nom::event::feed_event` for connection, completion and
-failure responses to the terminator.
-
-The subscriber relays borrowed capture events synchronously to the sink, which transfers
+On each accepted `app_start`, the sink creates a fresh private MD writer before forwarding
+start to the subscriber. Counters belong to that run; a later run appends to the same configured
+file. The subscriber relays borrowed capture events synchronously to the sink, which transfers
 ownership to the writer before returning. Only the writer thread performs data file I/O.
 
-The health checker cancels its timer before forwarding `nom::event::app_stop` to the sink.
-The sink forwards the command to the subscriber, drains and stops the writer, then logs its
-counters. A `feed_event::stop_failed` response reports a final-flush failure to the local
-terminator, which changes the exit result to failure
-without generating another stop. Every explicitly received `app_stop` is still forwarded.
-The app only starts the assembly, runs its I/O context and
-returns the exit code; it does not access the writer.
+`app_control` cancels its timers and pending signal wait before forwarding
+`nom::event::app_stop` to the sink. The sink forwards the command to the subscriber, drains and
+stops the writer, then logs its counters. An `app_failed` response reports a final-flush failure
+to `app_control`, which changes the run result to failure without generating another stop.
+The app starts the assembly, runs its I/O context and returns the exit code; it does not access
+the writer. Remaining callbacks drain before another run uses the same assembly.
 
-`./bootstrap.sh complete` runs the health-check lifecycle tests, both logger unit suites,
-generated configuration validation and a local TLS integration test. The app fixture covers
-mixed-symbol JSON, CR/LF replacement, heartbeats, transport/storage/final-flush failures, signal
-draining, runtime limits, append behavior, configuration checks, required symbols, operational
-log levels/file output, nested defaults/overrides and reader recovery. The `dev` preset skips
-the TLS integration test.
+`./bootstrap.sh complete` runs the application-control lifecycle and configuration-ownership tests,
+both logger unit suites, generated configuration validation and a local TLS integration test. The app
+fixture covers mixed-symbol JSON, CR/LF replacement, heartbeats, transport/storage/final-flush
+failures, signal draining, repeated operational-log flushes, runtime limits during connection setup, append behavior,
+configuration checks, required symbols, operational log levels/file output, nested
+defaults/overrides and reader recovery. The `dev` preset skips the TLS integration test.

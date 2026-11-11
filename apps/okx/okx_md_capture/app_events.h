@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-// SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+// SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 #pragma once
 
@@ -16,6 +16,15 @@ namespace nom::event
     };
 
     struct app_health_check
+    {
+    };
+
+    // Application responses travel back to app_control, which consumes them.
+    struct app_finished
+    {
+    };
+
+    struct app_failed
     {
     };
 } // namespace nom::event

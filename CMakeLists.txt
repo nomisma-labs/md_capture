@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-# SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+# SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 cmake_minimum_required(VERSION 4.4)
 
@@ -14,26 +14,16 @@ project(md_capture
 include(cmake/kit/nom_kit.cmake)
 nom_project_options()
 
-# Dependencies come from external/ submodules (docs/kit/howto.md#a-dependency). In a superbuild the
-# outermost FetchContent_Declare wins, so every repo shares one copy.
+if(nom_install)
+    include(GNUInstallDirs)
+    install(FILES ${PROJECT_SOURCE_DIR}/LICENSE
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/${PROJECT_NAME})
+endif()
 
-# Declare the application's pins before loading dependencies with shared transitive components.
-nom_require_submodule(external/base)
-FetchContent_Declare(base SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/base)
-
-nom_require_submodule(external/assembly)
-FetchContent_Declare(assembly SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/assembly)
-
-nom_require_submodule(external/spd_logger)
-FetchContent_Declare(spd_logger SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/spd_logger)
-
+# asio_comm supplies communication and the nom::core facade through nom_core.
 nom_require_submodule(external/asio_comm)
 FetchContent_Declare(asio_comm SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/asio_comm)
-
-nom_require_submodule(external/json_config)
-FetchContent_Declare(json_config SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/json_config)
-
-FetchContent_MakeAvailable(base assembly spd_logger asio_comm json_config)
+FetchContent_MakeAvailable(asio_comm)
 
 # Boost comes from system packages (docs/kit/build.md#dependencies).
 nom_find_boost()

@@ -1,34 +1,33 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-// SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+// SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 #pragma once
 
 #include "app_events.h"
 #include "compiler_workarounds.h"
-#include "feed_events.h"
 
 #include <json_config/config.h>
 #include <spd_logger/logging.h>
 
 import std;
 import nom.asio_comm;
-import nom.assembly;
-import nom.json_config;
+import nom.core;
 import nom.md_logger;
-import nom.spd_logger;
-import nom.url;
 
 namespace okx
 {
     using namespace nom::cfg_types;
 
-    inline std::string normalized_symbol(std::string symbol)
+    namespace detail
     {
-        const auto& facet = std::use_facet<std::ctype<char>>(std::locale::classic());
+        inline std::string normalized_symbol(std::string symbol)
+        {
+            const auto& facet = std::use_facet<std::ctype<char>>(std::locale::classic());
 
-        facet.toupper(symbol.data(), symbol.data() + symbol.size());
-        return symbol;
-    }
+            facet.toupper(symbol.data(), symbol.data() + symbol.size());
+            return symbol;
+        }
+    } // namespace detail
 
     struct connection_config
     {
@@ -68,9 +67,8 @@ namespace okx
         // config_owner constructs and validates the context before nodes; GCC 16 loses that ordering here.
         NOM_GCC16_IGNORE_BEGIN("-Wmaybe-uninitialized")
         md_subscriber()
-            : request_(make_subscription(nom::ctx(this).cfg().md_subscriber.subscription)),
-              client_(nom::ctx(this).io.get_executor(),
-                      nom::url(*nom::ctx(this).cfg().md_subscriber.connection->endpoint)),
+            : request_(make_subscription(cfg().subscription)),
+              client_(nom::ctx(this).io.get_executor(), nom::url(*cfg().connection->endpoint)),
               heartbeat_(nom::ctx(this).io.get_executor())
         {
         }
@@ -78,6 +76,7 @@ namespace okx
 
         void on_request(nom::event::app_start event)
         {
+            awaiting_pong_ = false;
             client_.connect(nom::web_socket::ws_delegate{std::ref(*this)});
             relay::pass_request(this, event);
         }
@@ -85,14 +84,19 @@ namespace okx
         void on_request(nom::event::app_stop event)
         {
             heartbeat_.cancel();
+            awaiting_pong_ = false;
             client_.close();
+            relay::pass_request(this, event);
+        }
+
+        void on_request(nom::event::app_health_check event)
+        {
             relay::pass_request(this, event);
         }
 
         void operator()(nom::web_socket& connection, const nom::event::on_connected&)
         {
             LINFO("Connected: {}", connection.session_id());
-            relay::pass_response(this, nom::event::feed_event::connected);
             if (!connection.is_connected())
                 return;
             if (!connection.send(request_))
@@ -108,7 +112,7 @@ namespace okx
             const auto received_at = std::chrono::system_clock::now();
             // OKX pong is application heartbeat traffic; data records contain received JSON objects.
             if (event.sv_data() != "pong")
-                relay::pass_response(this, nom::capture_event{received_at, event.sv_data()});
+                relay::pass_response(this, nom::event::market_data{received_at, event.sv_data()});
             if (!client_.is_connected())
                 return;
             if (!awaiting_pong_ || event.sv_data() == "pong")
@@ -139,7 +143,7 @@ namespace okx
             nlohmann::json args = nlohmann::json::array();
             for (const auto& symbol : config.symbols)
                 for (const auto& channel : *config.channels)
-                    args.push_back({{"channel", channel}, {"instId", normalized_symbol(symbol)}});
+                    args.push_back({{"channel", channel}, {"instId", detail::normalized_symbol(symbol)}});
             auto request = nlohmann::json{{"op", "subscribe"}, {"args", args}}.dump();
             if (request.size() > 64 * 1024)
                 throw std::invalid_argument("Subscription exceeds 64 KiB");
@@ -149,7 +153,7 @@ namespace okx
         void fail(std::string_view reason)
         {
             LERROR("Feed failed: {}", reason);
-            relay::pass_response(this, nom::event::feed_event::failed);
+            relay::pass_response(this, nom::event::app_failed{});
         }
 
         void arm_heartbeat()
@@ -204,7 +208,7 @@ namespace okx
         std::set<std::string> unique_symbols;
         for (const auto& symbol : symbols)
         {
-            const auto normalized = normalized_symbol(symbol);
+            const auto normalized = detail::normalized_symbol(symbol);
             if (normalized.empty() || normalized.front() == '-' || normalized.back() == '-' ||
                 std::ranges::count(normalized, '-') != 1 ||
                 normalized.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-") != std::string::npos)

@@ -1,18 +1,20 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-// SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+// SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 module;
 
 #include <spd_logger/logging.h>
 
 #include <cerrno>
+// Keep C stdio declarations visible before module imports (GCC 16 optimizer workaround).
+#include <cstdio>
 #include <fcntl.h>
 #include <unistd.h>
 
 module nom.md_logger;
 
 import std;
-import nom.spd_logger;
+import nom.core;
 
 namespace nom
 {
@@ -49,7 +51,7 @@ namespace nom
         }
     }
 
-    bool md_logger::log(const capture_event& event)
+    bool md_logger::log(const event::market_data& event)
     {
         message msg{std::chrono::duration_cast<std::chrono::microseconds>(event.received_at.time_since_epoch()).count(),
                     std::string(event.payload)};

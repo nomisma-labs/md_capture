@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-// SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+// SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 module;
 
 #include <json_config/config.h>
@@ -7,22 +7,31 @@ module;
 export module nom.md_logger;
 
 import std;
-import nom.json_config;
+import nom.core;
+
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ == 16
+// Load core's existing config-wrapper instantiations before declaring another config.
+// Otherwise GCC 16 can emit a module that fails to import with "Bad file data".
+static_assert(sizeof(nom::log_config) > 0);
+#endif
 
 export namespace nom
 {
-    // Views are borrowed for log(); accepted payloads are copied before return.
-    struct capture_event
+    namespace event
     {
-        std::chrono::system_clock::time_point received_at;
-        std::string_view payload;
-    };
+        // Views are borrowed for log(); accepted payloads are copied before return.
+        struct market_data
+        {
+            std::chrono::system_clock::time_point received_at;
+            std::string_view payload;
+        };
+    } // namespace event
 
     struct md_logger_config
     {
         cfg_string file{};
-        cfg_defaulted<cfg_uint> flush_records{4096};
-        cfg_defaulted<cfg_uint> flush_ms{200};
+        cfg_defaulted<cfg_uint> flush_records{16 * 1024};
+        cfg_defaulted<cfg_uint> flush_ms{2000};
 
         std::expected<void, std::string> validate() const;
     };
@@ -47,7 +56,7 @@ export namespace nom
         md_logger& operator=(const md_logger&) = delete;
 
         // One serialized producer. Copy payloads before returning; use the pending buffer if the queue is busy.
-        bool log(const capture_event& event);
+        bool log(const event::market_data& event);
         // Stop the producer first. Call from one lifecycle owner, never from the writer thread.
         bool stop();
         std::optional<std::string> error() const;

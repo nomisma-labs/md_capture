@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-# SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+# SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 """Inspect timestamped text capture; --recover reads complete records before a malformed tail."""
 

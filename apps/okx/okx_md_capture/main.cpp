@@ -1,59 +1,47 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-// SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+// SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-// Load JSON headers before the module imports in app_terminator.h.
-#include <json_config/config.h>
-
-#include "asio_service.h"
-
+#include "app_control.h"
 #include "app_events.h"
-#include "app_terminator.h"
+#include "asio_service.h"
 #include "config_owner.h"
-#include "health_checker.h"
-#include "log_config.h"
 #include "md_sink.h"
 #include "md_subscriber.h"
 
+#include <json_config/config.h>
+
 import std;
-import nom.assembly;
-import nom.json_config;
-import nom.spd_logger;
+import nom.core;
 
 using namespace nom::cfg_types;
 
 struct app_config
 {
-    static constexpr bool require_completion = false;
-
     cfg_defaulted<nom::log_config> log;
-    cfg_defaulted<nom::health_checker_config> health_checker;
+    cfg_defaulted<nom::app_control_config> app_control;
     okx::md_subscriber_config md_subscriber;
     nom::md_sink_config md_sink;
-    cfg_optional<cfg_uint> exit_after_sec;
 
     std::expected<void, std::string> validate() const
     {
         if (const auto result = log->validate(); !result)
             return std::unexpected("/log" + result.error());
-        if (const auto result = health_checker->validate(); !result)
-            return std::unexpected("/health_checker" + result.error());
+        if (const auto result = app_control->validate(); !result)
+            return std::unexpected("/app_control" + result.error());
         if (const auto result = md_subscriber.validate(); !result)
             return std::unexpected("/md_subscriber" + result.error());
         if (const auto result = md_sink.validate(); !result)
             return std::unexpected("/md_sink" + result.error());
-        if (exit_after_sec && *exit_after_sec > 86400)
-            return std::unexpected("/exit_after_sec must be 0..86400 or null");
         return {};
     }
 };
 
-NOM_JCONFIG(app_config, log, health_checker, md_subscriber, md_sink, exit_after_sec)
+NOM_JCONFIG(app_config, log, app_control, md_subscriber, md_sink)
 
 struct md_capture_assembly : nom::assembly<md_capture_assembly,
                                            nom::config_owner,
                                            nom::asio_service,
-                                           nom::app_terminator,
-                                           nom::health_checker,
+                                           nom::app_control,
                                            nom::md_sink,
                                            okx::md_subscriber>
 {
@@ -61,7 +49,6 @@ struct md_capture_assembly : nom::assembly<md_capture_assembly,
 
     struct custom_traits : nom::event_suppressors
     {
-        // Application-wide requests finish after the last participating node.
         using suppressed_requests =
             nom::type_list<nom::event::app_start, nom::event::app_stop, nom::event::app_health_check>;
     };
@@ -73,13 +60,15 @@ struct okx_md_capture : nom::relay<md_capture_assembly>
     {
     }
 
-    int run()
+    nom::app_status run()
     {
+        if (ctx().io.stopped())
+            ctx().io.restart();
         request(nom::event::app_start{});
         // Stop handlers close transport and drain the writer; keep nodes alive
         // until the remaining I/O callbacks have drained.
         ctx().io.run();
-        return ctx().exit_code.value_or(1);
+        return ctx().status();
     }
 };
 
@@ -113,7 +102,7 @@ int main(int argc, char** argv)
         okx_md_capture app(load_config());
         const auto result = app.run();
         nom::flush_logger(nom::main_logger);
-        return result;
+        return result == nom::app_status::success ? 0 : 1;
     }
     catch (const std::exception& error)
     {

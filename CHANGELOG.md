@@ -19,6 +19,18 @@ and versions follow [Semantic Versioning](https://semver.org); how to release:
 
 ### Changed
 
+- License project-owned code and documentation under Sustainable Use License 1.0 (source available),
+  retaining Alexey Tkachenko's copyright and third-party license notices.
+- Synchronize the shared build kit with `cmake_template v0.14.0`, retaining its MIT license,
+  and record the repository's license selection in `project_license.json`.
+- Include the project license in installed artifacts alongside the applicable MIT kit notices.
+
+- Pin `asio_comm v0.6.0` as the sole direct repository dependency, obtaining `nom_core v0.3.0`
+  through its dependency bundle. Replace separate core module imports and component links with
+  `nom.core` / `nom::core`, and require `nom_core 0.3` in the installed MD logger package.
+- Use the logging JSON mappings exported by `nom.core` and remove the OKX app's local
+  `log_config.h`; logging configuration keys, defaults and accepted level names stay the same.
+
 - Use no-throw `LERROR` from `spd_logger v0.8.0` for MD logger cleanup, removing the
   temporary catch around the diagnostic.
 

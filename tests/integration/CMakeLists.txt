@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Alexey Tkachenko
-# SPDX-License-Identifier: LicenseRef-Nomisma-Labs-Proprietary
+# SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
 if(nom_build_tests AND TARGET okx_md_capture)
     find_package(Python 3.10 REQUIRED COMPONENTS Interpreter)

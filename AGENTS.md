@@ -2,8 +2,9 @@
 
 <!-- repo-description:begin -->
 `md_capture` is the application repository for production cryptocurrency market-data capture
-and symbol discovery. It depends on `base`, `assembly`, `spd_logger`, `asio_comm` and
-`json_config`. `nom.md_logger` provides `md_logger` with one serialized producer, a contention
+and symbol discovery. Its sole direct repository dependency is `asio_comm`, which supplies
+communication and the `nom.core` module / `nom::core` target through `nom_core`.
+`nom.md_logger` provides `md_logger` with one serialized producer, a contention
 pending buffer, one writer thread and one configured append-only file. The independent `nom.md_logger_ai` module provides `md_logger_ai`
 with bounded queues and segment publication. The first app, `okx_md_capture`, captures configured
 Spot instruments using JSON configuration. Production follow-up work is tracked in `TODO.md`.

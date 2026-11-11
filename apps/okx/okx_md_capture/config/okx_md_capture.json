@@ -1,10 +1,13 @@
 {
     "log": {
         "level": "info",
-        "file": null
+        "file": {
+            "name": "log/okx_md_capture.log"
+        }
     },
-    "health_checker": {
-        "period_msec": 2000
+    "app_control": {
+        "exit_after_sec": null,
+        "health_check_period_msec": 2000
     },
     "md_subscriber": {
         "connection": {
@@ -24,9 +27,7 @@
     },
     "md_sink": {
         "md_logger": {
-            "file": "data/okx_spot.txt",
-            "flush_records": 4096,
-            "flush_ms": 200
+            "file": "data/okx_spot.dat"
         }
     }
 }
