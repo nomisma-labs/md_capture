@@ -1,5 +1,7 @@
 # MD capture reference design
 
+AI-generated : finish review
+
 The doc describes the current state of MD capture for OKX and general approaches which will be applied to all other exchanges.
 
 Please also see:

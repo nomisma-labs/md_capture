@@ -1,5 +1,7 @@
 # Improvement proposal
 
+AI-generated : to be reviewed
+
 Design checkpoint, 8 November 2026. The [MD capture reference design](md_capture_reference_design.md) describes the
 current recorder. This proposal records the next storage and source contracts, without selecting
 class APIs or the placement of shared application services.

@@ -1,5 +1,7 @@
 # Market data services
 
+AI-generated : to be reviewed
+
 Exploratory proposal, 8 November 2026. The goal is a service whose product is useful, inspectable
 market data. Delivery formats, retention periods, commercial terms and service promises are not
 yet selected. [Backend processing](backend_processing.md) separates this work from realtime capture.

@@ -1,5 +1,7 @@
 # Backend processing
 
+AI-generated : to be reviewed
+
 Design direction, 8 November 2026. The realtime/backend separation and independent redundant
 captures are agreed directions. The services below are proposed responsibilities, not deployed
 capabilities. See the [MD capture reference design](md_capture_reference_design.md) for the current capture boundary
