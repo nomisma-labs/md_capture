@@ -6,6 +6,11 @@ and versions follow [Semantic Versioning](https://semver.org); how to release:
 
 ## [Unreleased]
 
+- Shared application nodes, lifecycle events, `md_logger` and `md_sink` are available through
+  `nom.services` / `nom::services`. `nom.md_logger_ai` remains independent.
+- GCC 16 Debug builds share Asio declarations between service partitions to avoid duplicate
+  `query`, `require` and `prefer` symbols.
+
 ## [0.1.0] - 2026-11-12
 
 Initial release.

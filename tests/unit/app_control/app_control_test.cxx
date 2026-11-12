@@ -1,16 +1,16 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-#include "../../../apps/okx/okx_md_capture/app_control.h"
-#include "../../../apps/okx/okx_md_capture/asio_service.h"
-#include "../../../apps/okx/okx_md_capture/config_owner.h"
-
 #include <json_config/config.h>
+#include <spd_logger/logging.h>
+
+#include <csignal>
 
 #include <catch2/catch_test_macros.hpp>
 
 import std;
 import nom.core;
+import nom.services;
 
 using namespace std::chrono_literals;
 

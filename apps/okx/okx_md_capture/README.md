@@ -2,7 +2,7 @@
 
 `okx_md_capture` captures OKX Spot WebSocket messages through `asio_comm`, composes the app
 with Assembly/relay, loads JSON config with `json_config`, and writes one ordered capture
-stream through `nom::md_logger` from the `nom.md_logger` module. Operational logs contain status and counters, not raw payloads.
+stream through `nom::md_logger` from the `nom.services` module. Operational logs contain status and counters, not raw payloads.
 It is the current implementation described by the [MD capture reference design](../../../docs/md_capture/md_capture_reference_design.md).
 
 ## Build and run
@@ -166,6 +166,9 @@ consumes `app_finished` and `app_failed`. Delivery between nodes is synchronous 
 thread. The sink copies received data into its private MD logger before returning; file I/O
 runs on the logger's writer thread.
 
-The assembly also includes [config_owner](config_owner.h), which owns the shared immutable
-config, and [asio_service](asio_service.h), which provides the I/O context. See
+The assembly imports `nom.services` for `app_control`, the application events, `md_logger`,
+[md_sink](../../../src/services/md_sink.cppm),
+[config_owner](../../../src/services/config_owner.cppm), which owns the shared immutable
+config, and [asio_service](../../../src/services/asio_service.cppm), which provides the I/O context.
+`okx::md_subscriber` is local to this application. See
 [Application control](../../../docs/md_capture/app_control.md) for lifecycle events and transitions.

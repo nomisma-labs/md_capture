@@ -11,7 +11,7 @@ module;
 #include <fcntl.h>
 #include <unistd.h>
 
-module nom.md_logger;
+module nom.services;
 
 import std;
 import nom.core;

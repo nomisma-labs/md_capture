@@ -1,14 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-// Catch2 must precede config_owner.h: GCC 16 rejects its standard headers after import std.
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 
-#include "../../../apps/okx/okx_md_capture/config_owner.h"
-
 import std;
 import nom.core;
+import nom.services;
 
 namespace
 {

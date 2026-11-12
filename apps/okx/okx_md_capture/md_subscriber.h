@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "app_events.h"
 #include "compiler_workarounds.h"
 
 #include <json_config/config.h>
@@ -12,7 +11,7 @@
 import std;
 import nom.asio_comm;
 import nom.core;
-import nom.md_logger;
+import nom.services;
 
 namespace okx
 {

@@ -1,26 +1,25 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-#pragma once
-
-#include "app_events.h"
+module;
 
 #include <base/util/enum.h>
 #include <json_config/config.h>
 #include <spd_logger/logging.h>
 
-#include <boost/asio/any_io_executor.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/system/error_code.hpp>
 #include <csignal>
 #include <cstdio>
 #include <sys/types.h>
 
+export module nom.services:app_control;
+
 import std;
 import nom.asio_comm;
 import nom.core;
+import :app_events;
+import :asio_service;
 
-namespace nom
+export namespace nom
 {
     NOM_ENUM(app_status, uint8_t, init, starting, running, stopping, success, failure)
 
@@ -170,11 +169,11 @@ namespace nom
         void wait_for_signal()
         {
             signals_.async_wait(
-                [this, generation = run_generation_](const boost::system::error_code& error, int signal_number)
+                [this, generation = run_generation_](const detail::asio_error_code& error, int signal_number)
                 { on_signal(error, signal_number, generation); });
         }
 
-        void on_signal(const boost::system::error_code& error, int signal_number, std::uint64_t generation)
+        void on_signal(const detail::asio_error_code& error, int signal_number, std::uint64_t generation)
         {
             switch (status_)
             {
@@ -259,7 +258,7 @@ namespace nom
             relay::pass_request(this, nom::event::app_stop{});
         }
 
-        boost::asio::signal_set signals_;
+        detail::asio_signal_set signals_;
         std::optional<nom::timer> exit_timer_;
         std::optional<nom::timer> health_timer_;
         std::uint16_t run_generation_{};

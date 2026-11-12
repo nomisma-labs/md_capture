@@ -1,17 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-#include "app_control.h"
-#include "app_events.h"
-#include "asio_service.h"
-#include "config_owner.h"
-#include "md_sink.h"
 #include "md_subscriber.h"
 
 #include <json_config/config.h>
 
 import std;
 import nom.core;
+import nom.services;
 
 using namespace nom::cfg_types;
 

@@ -1,19 +1,19 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-#pragma once
-
-#include "app_events.h"
-#include "compiler_workarounds.h"
+module;
 
 #include <json_config/config.h>
 #include <spd_logger/logging.h>
 
+export module nom.services:md_sink;
+
 import std;
 import nom.core;
-import nom.md_logger;
+import :app_events;
+import :md_logger;
 
-namespace nom
+export namespace nom
 {
     struct md_sink_config
     {

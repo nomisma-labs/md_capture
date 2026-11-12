@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-#pragma once
+export module nom.services:app_events;
 
 // Application-wide requests: every handler must pass_request the event onward.
 // The assembly suppresses these requests only after the last participating node.
-namespace nom::event
+export namespace nom::event
 {
     struct app_start
     {

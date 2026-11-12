@@ -1,13 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-#pragma once
+module;
 
 #include <base/util/force_inline.h>
 
+export module nom.services:config_owner;
+
 import std;
 
-namespace nom
+export namespace nom
 {
     template <typename Traits> struct config_owner
     {

@@ -1,5 +1,10 @@
 # Application control
 
+Import `nom.services` and link `nom::services` for the shared `config_owner`, `asio_service`,
+`app_control` and [md_sink](../../src/services/md_sink.cppm) assembly nodes, application events
+and [MD logger](md_logger.md). Their module lives in `src/services/`.
+`okx::md_subscriber` remains in the OKX application; `nom.md_logger_ai` is a separate module.
+
 `nom::app_control` coordinates application start and stop, handles console signals, enforces an
 optional runtime limit and periodically asks downstream nodes to check their health. Components
 report completion through `app_finished` and failure through `app_failed`. The controller
@@ -11,8 +16,8 @@ The controller privately owns `status_`, of type `nom::app_status`. Clients read
 `stopping` describe synchronous notification in progress, between `init`, `running` and the
 terminal results `success`/`failure`. A terminal result allows another run. `main.cpp` explicitly
 maps `success` to exit code 0 and other results to 1; enum values are not process exit codes.
-See [app_control.h](../../apps/okx/okx_md_capture/app_control.h) for the implementation and
-[app_events.h](../../apps/okx/okx_md_capture/app_events.h) for the event types.
+See [app_control.cppm](../../src/services/app_control.cppm) for the implementation and
+[app_events.cppm](../../src/services/app_events.cppm) for the event types.
 
 ## Application event flow (on example of MD capture)
 

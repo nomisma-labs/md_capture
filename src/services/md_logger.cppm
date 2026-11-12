@@ -4,7 +4,7 @@ module;
 
 #include <json_config/config.h>
 
-export module nom.md_logger;
+export module nom.services:md_logger;
 
 import std;
 import nom.core;

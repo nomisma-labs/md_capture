@@ -10,7 +10,8 @@ information for historical analysis and replay.
 | Component | Purpose |
 | --- | --- |
 | [okx_md_capture](apps/okx/okx_md_capture/README.md) | OKX Spot MD capture application with configurable subscriptions and output. |
-| [md_logger](docs/md_capture/md_logger.md) | Buffered file writer for received market data and local receive timestamps. |
+| [nom.services](docs/md_capture/app_control.md) | Shared configuration ownership, Asio context, application control, events, capture sink and MD logger. |
+| [md_logger](docs/md_capture/md_logger.md) | Buffered file writer in `nom.services` for received market data and local receive timestamps. |
 
 See the [documentation index](docs/md_capture/README.md) for the reference design,
 operating guides and improvement plans.

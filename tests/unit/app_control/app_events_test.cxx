@@ -1,18 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Alexey Tkachenko
 // SPDX-License-Identifier: LicenseRef-Sustainable-Use-1.0
 
-#include "../../../apps/okx/okx_md_capture/app_control.h"
-#include "../../../apps/okx/okx_md_capture/asio_service.h"
-#include "../../../apps/okx/okx_md_capture/config_owner.h"
-#include "../../../apps/okx/okx_md_capture/md_sink.h"
-#include "../../../apps/okx/okx_md_capture/md_subscriber.h"
-
+#include <catch2/catch_test_macros.hpp>
 #include <json_config/config.h>
 
-#include <catch2/catch_test_macros.hpp>
+#include "../../../apps/okx/okx_md_capture/md_subscriber.h"
 
 import std;
 import nom.core;
+import nom.services;
 
 using namespace std::chrono_literals;
 

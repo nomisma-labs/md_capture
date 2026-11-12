@@ -9,20 +9,20 @@ messages into an in-memory queue, with a producer-owned pending buffer for conte
 writer thread to serialize and append batches.
 It has no symbol/channel table, channel distribution, inheritance or per-symbol files.
 
-Import `nom.md_logger` and link `nom::md_logger`. Applications also link `nom::core`
+Import `nom.services` and link `nom::services`. Applications also link `nom::core`
 to initialize the application logger. Public declarations and private state are in
-[md_logger.cppm](../../src/md_logger/md_logger.cppm); function definitions and POSIX file I/O
-are in [md_logger.cpp](../../src/md_logger/md_logger.cpp). There is no implementation header.
+[md_logger.cppm](../../src/services/md_logger.cppm); function definitions and POSIX file I/O
+are in [md_logger.cpp](../../src/services/md_logger.cpp). There is no implementation header.
 
 The repository installs a CMake package named `md_capture` with two separate targets:
-`nom::md_logger` and `nom::md_logger_ai`. Link only the writer you use. The OKX app links
-`nom::md_logger`; neither writer target imports or links the other.
+`nom::services` and `nom::md_logger_ai`. The OKX app links `nom::services` for the shared
+application nodes and `md_logger`; neither target imports or links the other.
 
 ## First use
 
 ```cpp
 import std;
-import nom.md_logger;
+import nom.services;
 import nom.core;
 
 nom::init_logger(nom::main_logger);
@@ -79,17 +79,17 @@ capacity limit**. The queue may grow while storage is slow; this implementation 
 messages or impose a backlog limit. The interval does not bound filesystem or retry delays.
 
 `md_logger_config` uses `base`'s config types and owns its validation. `file` is required; the
-flush settings use `cfg_defaulted`. Its `NOM_JCONFIG` mapping is exported from `nom.md_logger`,
+flush settings use `cfg_defaulted`. Its `NOM_JCONFIG` mapping is exported from `nom.services`,
 which publicly links `nom::core`. The mapping macro comes from `<json_config/config.h>`;
 `import nom.core;` supplies its helpers in the module interface. Consumers can use
-`md_logger_config` through `nom.md_logger`; code that names the core configuration or logging
+`md_logger_config` through `nom.services`; code that names the core configuration or logging
 APIs directly imports `nom.core` too.
 
 The interface contains a GCC 16 compatibility guard that loads the core logging configuration
 before declaring the MD configuration. This avoids a compiler failure when importing the
 compiled module; it does not change configuration or runtime behavior.
 
-The [OKX sink config](../../apps/okx/okx_md_capture/md_sink.h) embeds `md_logger_config`.
+The [shared sink config](../../src/services/md_sink.cppm) embeds `md_logger_config`.
 The [application config](../../apps/okx/okx_md_capture/main.cpp) exposes it at `md_sink.md_logger`,
 and the sink passes it straight to the logger constructor.
 
@@ -184,7 +184,7 @@ MD-writer flush or change its batching and shutdown behavior.
 
 Import `nom.md_logger_ai` and link `nom::md_logger_ai` for `nom::md_logger_ai`. It owns
 `md_logger_ai_config`, `md_logger_ai_stats`, `capture_result` and its input type `capture_event_ai`.
-`nom.md_logger` owns `nom::event::market_data` for `md_logger`; the two event types have the same timestamp
+`nom.services` owns `nom::event::market_data` for `md_logger`; the two event types have the same timestamp
 and payload fields but are independent, so both modules can be imported together. Each writer
 has its own unit suite.
 
