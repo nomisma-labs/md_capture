@@ -6,6 +6,8 @@ and versions follow [Semantic Versioning](https://semver.org); how to release:
 
 ## [Unreleased]
 
+- GitHub CI is enabled for build, test and quality checks. A Docker toolchain helper follows
+  the latest CI image, with container build outputs separated from native builds.
 - Shared application nodes, lifecycle events, `md_logger` and `md_sink` are available through
   `nom.services` / `nom::services`. `nom.md_logger_ai` remains independent.
 - GCC 16 Debug builds share Asio declarations between service partitions to avoid duplicate

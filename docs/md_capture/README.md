@@ -12,6 +12,7 @@ They describe responsibilities and data contracts independently of module placem
 
 - [Restart checklist](../../TODO.md): work to resume after design review.
 - [Project overview](../../README.md): purpose, key components, dependencies, build and license.
+- [Development and CI](development.md): hosted build checks and the Docker development environment.
 - [MD logger implementation guide](md_logger.md): current API, configuration and failure handling.
 - [Application control](app_control.md): lifecycle state machine, events, signals and transition tables.
 - [Applications](../../apps/README.md): current capture applications and their operating guides.
