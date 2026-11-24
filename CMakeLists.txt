@@ -7,7 +7,7 @@ include(cmake/kit/std_modules.cmake)
 
 # The version lives only here; releases are tagged v<version> (docs/kit/build.md#versioning).
 project(md_capture
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "Production market-data capture and symbol discovery applications"
     LANGUAGES CXX)
 

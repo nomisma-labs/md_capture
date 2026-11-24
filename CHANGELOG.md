@@ -6,6 +6,11 @@ and versions follow [Semantic Versioning](https://semver.org); how to release:
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-24
+
+- Support CMake 4.5 native `import std` and retain CMake 4.4 support through cmake_template v0.14.1.
+- Update dependency pins to asio_comm v0.6.2.
+
 - GitHub CI is enabled for build, test and quality checks. A Docker toolchain helper follows
   the latest CI image, with container build outputs separated from native builds.
 - Shared application nodes, lifecycle events, `md_logger` and `md_sink` are available through
