@@ -7,3 +7,4 @@ __pycache__/
 # Sandbox experiments stay in the clone; apps/sandbox/CMakeLists.txt builds whichever exist.
 /apps/sandbox/*/
 /data/
+/review.md
